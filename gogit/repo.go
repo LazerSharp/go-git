@@ -108,3 +108,9 @@ func RepoCreate(pth string) error {
 	cfg.Write(f)
 	return nil
 }
+
+func CatFile(typ, obj string) {
+	repo := Must(NewGitRepository(".", false))
+	o := Must(ReadObject(repo, obj))
+	o.Serialize(os.Stdout)
+}

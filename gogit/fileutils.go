@@ -1,7 +1,6 @@
 package gogit
 
 import (
-	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -44,8 +43,8 @@ func Must[T any](obj T, err error) T {
 
 func Check(err error) {
 	if err != nil {
-		//panic(err)
-		fmt.Println("fatal: ", err)
-		os.Exit(1)
+		panic(err)
+		// fmt.Println("fatal: ", err)
+		// os.Exit(1)
 	}
 }
