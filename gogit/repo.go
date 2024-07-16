@@ -2,6 +2,7 @@ package gogit
 
 import (
 	"fmt"
+	"log"
 	"log/slog"
 	"os"
 	"path"
@@ -112,5 +113,8 @@ func RepoCreate(pth string) error {
 func CatFile(typ, obj string) {
 	repo := Must(NewGitRepository(".", false))
 	o := Must(ReadObject(repo, obj))
+	if o == nil {
+		log.Fatal("Unable to read!")
+	}
 	o.Serialize(os.Stdout)
 }

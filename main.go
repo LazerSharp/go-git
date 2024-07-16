@@ -13,17 +13,21 @@ func main() {
 
 	args := os.Args
 	//fmt.Println("Hello World!", args)
-	switch args[1] {
+	subcmd := args[1]
+	restArgs := args[2:]
+	switch subcmd {
 	case "init":
-		cmd_init(args[2:])
+		cmdInit(restArgs)
 	case "cat-file":
-		cmd_cat_file(args[2:])
-	case "_":
+		cmdCatFile(restArgs)
+	case "hash-object":
+		cmdHashObject(restArgs)
+	default:
 		panic("Bad command!")
 	}
 }
 
-func cmd_init(args []string) {
+func cmdInit(args []string) {
 
 	var path string
 	if len(args) < 1 {
@@ -35,7 +39,7 @@ func cmd_init(args []string) {
 	fmt.Println("Git repo initialized!")
 }
 
-func cmd_cat_file(args []string) {
+func cmdCatFile(args []string) {
 
 	if len(args) != 2 {
 		log.Fatal("cat-file: invalid args")
@@ -44,4 +48,16 @@ func cmd_cat_file(args []string) {
 	obj := args[1]
 	gogit.CatFile(typ, obj)
 
+}
+
+func cmdHashObject(args []string) {
+
+	if len(args) < 1 {
+		log.Fatal("hash-object: file name missing")
+	}
+	fpth := args[0]
+	f := gogit.Must(os.Open(fpth))
+	defer gogit.Check(f.Close())
+	sha := gogit.Must(gogit.WriteObject(gogit.NewBlob(f), nil))
+	fmt.Println(sha)
 }

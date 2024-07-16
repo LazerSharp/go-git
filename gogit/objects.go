@@ -2,7 +2,10 @@ package gogit
 
 import (
 	"bufio"
+	"bytes"
 	"compress/zlib"
+	"crypto/sha1"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"log/slog"
@@ -11,20 +14,10 @@ import (
 )
 
 type GitObject interface {
+	Len() int
 	Type() string
-	Serialize(w io.Writer)
-}
-
-type Blob struct {
-	Content []byte
-}
-
-func (b *Blob) Serialize(w io.Writer) {
-	w.Write(b.Content)
-}
-
-func (b *Blob) Type() string {
-	return "blob"
+	Serialize(w io.Writer) error
+	DeSerialize(r io.Reader) error
 }
 
 func DeSerializeObject(r io.Reader) (GitObject, error) {
@@ -47,8 +40,8 @@ func DeSerializeObject(r io.Reader) (GitObject, error) {
 	}
 
 	slog.Debug("DeSerializeObject: ", "type", typ, "length", ln)
-	bytes := make([]byte, ln)
-	n, err := br.Read(bytes)
+	byts := make([]byte, ln)
+	n, err := br.Read(byts)
 
 	if err != nil {
 		return nil, err
@@ -56,10 +49,12 @@ func DeSerializeObject(r io.Reader) (GitObject, error) {
 	if n != int(ln) {
 		return nil, fmt.Errorf("file corrupted! wrong length: %v", ln)
 	}
-
+	reader := bytes.NewReader(byts)
 	switch typ {
 	case "blob":
-		return &Blob{bytes}, nil
+		return NewBlob(reader), nil
+	case "commit":
+		return NewBlob(reader), nil
 	}
 
 	return nil, err
@@ -94,4 +89,41 @@ func ReadObject(repo *GitRepository, sha string) (GitObject, error) {
 
 	return DeSerializeObject(r)
 
+}
+
+func Sha1(content []byte) string {
+	h := sha1.New()
+	h.Write(content)
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+func WriteObject(obj GitObject, repo *GitRepository) (sha string, err error) {
+	var buf bytes.Buffer
+	fmt.Fprintf(&buf, "%s %d\x00", obj.Type(), obj.Len())
+	obj.Serialize(&buf)
+
+	sha = Sha1(buf.Bytes())
+	if repo == nil {
+		return sha, nil
+	}
+
+	// write to file
+	fpth, err := RepoFile(repo, true, sha[:2], sha[2:])
+
+	if e, _ := exists(fpth); e {
+		return sha, nil
+	}
+
+	if err != nil {
+		return "", err
+	}
+	f, err := os.Create(fpth)
+	if err != nil {
+		return "", err
+	}
+	w := zlib.NewWriter(f)
+	defer w.Close()
+	w.Write(buf.Bytes())
+
+	return sha, nil
 }
