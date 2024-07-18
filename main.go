@@ -57,7 +57,10 @@ func cmdHashObject(args []string) {
 	}
 	fpth := args[0]
 	f := gogit.Must(os.Open(fpth))
-	defer gogit.Check(f.Close())
-	sha := gogit.Must(gogit.WriteObject(gogit.NewBlob(f), nil))
+	defer func() {
+		gogit.Check(f.Close())
+	}()
+	obj := gogit.Must(gogit.NewBlob(f))
+	sha := gogit.Must(gogit.WriteObject(obj, nil))
 	fmt.Println(sha)
 }

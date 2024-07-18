@@ -6,15 +6,17 @@ type Blob struct {
 	Content []byte
 }
 
-func NewBlob(r io.Reader) *Blob {
+func NewBlob(r io.Reader) (*Blob, error) {
 	b := &Blob{}
 	if r != nil {
-		b.DeSerialize(r)
+		if err := b.DeSerialize(r); err != nil {
+			return nil, err
+		}
 	}
-	return b
+	return b, nil
 }
 
-func NewEmptyBlob() *Blob {
+func NewEmptyBlob() (*Blob, error) {
 	return NewBlob(nil)
 }
 
@@ -30,8 +32,4 @@ func (b *Blob) Serialize(w io.Writer) error {
 
 func (b *Blob) Type() string {
 	return "blob"
-}
-
-func (b *Blob) Len() int {
-	return len(b.Content)
 }

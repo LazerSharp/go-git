@@ -14,7 +14,6 @@ import (
 )
 
 type GitObject interface {
-	Len() int
 	Type() string
 	Serialize(w io.Writer) error
 	DeSerialize(r io.Reader) error
@@ -52,9 +51,9 @@ func DeSerializeObject(r io.Reader) (GitObject, error) {
 	reader := bytes.NewReader(byts)
 	switch typ {
 	case "blob":
-		return NewBlob(reader), nil
+		return NewBlob(reader)
 	case "commit":
-		return NewBlob(reader), nil
+		return NewBlob(reader)
 	}
 
 	return nil, err
@@ -98,11 +97,24 @@ func Sha1(content []byte) string {
 }
 
 func WriteObject(obj GitObject, repo *GitRepository) (sha string, err error) {
+	var cbuf bytes.Buffer
+
+	obj.Serialize(&cbuf) // read from object
+	content := cbuf.Bytes()
+
 	var buf bytes.Buffer
-	fmt.Fprintf(&buf, "%s %d\x00", obj.Type(), obj.Len())
-	obj.Serialize(&buf)
+	fmt.Fprintf(&buf, "%s %d\x00", obj.Type(), len(content))
+	n, err := buf.Write(content)
+
+	if err != nil {
+		return "", err
+	}
+	if n != len(content) {
+		return "", fmt.Errorf("not able to write all %d bytes", len(content))
+	}
 
 	sha = Sha1(buf.Bytes())
+
 	if repo == nil {
 		return sha, nil
 	}
