@@ -1,0 +1,3 @@
+[submodule "gogit/testdata"]
+	path = gogit/testdata
+	url = ../test-repo/

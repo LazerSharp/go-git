@@ -53,7 +53,9 @@ func DeSerializeObject(r io.Reader) (GitObject, error) {
 	case "blob":
 		return NewBlob(reader)
 	case "commit":
-		return NewBlob(reader)
+		return NewCommit(reader)
+	case "tree":
+		return NewTree(reader)
 	}
 
 	return nil, err
