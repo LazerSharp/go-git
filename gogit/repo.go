@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path"
+	"path/filepath"
 
 	"github.com/LazerSharp/go-git/config"
 )
@@ -117,4 +118,127 @@ func CatFile(typ, obj string) {
 		log.Fatal("Unable to read!")
 	}
 	o.Serialize(os.Stdout)
+}
+
+func (r *GitRepository) Checkout(cHash string) (err error) {
+
+	tmpDir := "chkout"
+	tpath := []string{"temp", tmpDir}
+	td, err := RepoFile(r, false, tpath...)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		err = os.RemoveAll(td)
+	}()
+	err = checkoutCommit(r, cHash, tpath...)
+	if err != nil {
+		return err
+	}
+
+	// remove workdir content
+	fpaths, err := filepath.Glob(filepath.Join(r.WorkTree, "*"))
+	if err != nil {
+		return err
+	}
+
+	for _, p := range fpaths {
+		if p == r.GitDir {
+			continue
+		}
+		err = os.RemoveAll(p)
+		if err != nil {
+			return err
+		}
+	}
+	// copy files / folders from td
+
+	tpaths, err := filepath.Glob(filepath.Join(td, "*"))
+	if err != nil {
+		return err
+	}
+
+	for _, tp := range tpaths {
+		_, f := filepath.Split(tp)
+
+		fmt.Printf("Moving %s to %s", tp, filepath.Join(r.WorkTree, f))
+		os.Rename(tp, filepath.Join(r.WorkTree, f))
+	}
+
+	return err
+}
+
+func checkoutCommit(repo *GitRepository, cHash string, pth ...string) error {
+
+	obj, err := ReadObject(repo, cHash)
+	if err != nil {
+		return err
+	}
+	if obj.Type() != "commit" {
+		return fmt.Errorf("invalid commit #: %s", cHash)
+	}
+
+	commit := obj.(*Commit)
+
+	return checkoutTree(repo, *commit.Tree, pth...)
+}
+
+func checkoutTree(repo *GitRepository, tHash string, pth ...string) error {
+
+	obj, err := ReadObject(repo, tHash)
+	if err != nil {
+		return err
+	}
+	if obj.Type() != "tree" {
+		return fmt.Errorf("invalid tree #: %s", tHash)
+	}
+
+	tree := obj.(*Tree)
+
+	for _, entr := range tree.Entries {
+		switch entr.Type {
+		case BlobEntry:
+			p := append(pth, entr.Path)
+			err = checkoutBlob(repo, entr.Hash, p...)
+		case TreeEntry:
+			p := append(pth, entr.Path)
+			err = checkoutTree(repo, entr.Hash, p...)
+		default:
+			err = fmt.Errorf("invalid type %s", entr.Type)
+		}
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func checkoutBlob(repo *GitRepository, bHash string, pth ...string) error {
+
+	// open work tree (code) file
+	fpth, err := RepoFile(repo, true, pth...)
+	if err != nil {
+		return err
+	}
+	f, err := os.Create(fpth)
+	if err != nil {
+		return err
+	}
+
+	defer func(f *os.File) {
+		Check(f.Close())
+	}(f)
+
+	// read objevt from git
+	o, err := ReadObject(repo, bHash)
+	if err != nil {
+		return err
+	}
+	if o.Type() != "blob" {
+		return fmt.Errorf("%s is not a file", fpth)
+	}
+
+	// stream file comtent from Blob object to work space file
+	return o.Serialize(f)
 }
